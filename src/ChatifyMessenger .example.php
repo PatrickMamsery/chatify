@@ -2,17 +2,13 @@
 
 namespace Chatify;
 
-// use App\Models\ChMessage as Message;
+use App\Models\ChMessage as Message;
 use App\Models\ChFavorite as Favorite;
 use Illuminate\Support\Facades\Storage;
 use Pusher\Pusher;
 use Illuminate\Support\Facades\Auth;
 use Exception;
 use Illuminate\Support\Facades\File;
-
-// customized changes
-use App\Models\SessionMessage as Message;
-use App\Models\Session;
 
 class ChatifyMessenger
 {
@@ -109,9 +105,9 @@ class ChatifyMessenger
         $attachment_title = null;
 
         $msg = Message::where('id', $id)->first();
-        
-        // customized changes
-        $msgRecepient = Session::where('consultantId', Auth::user()->id)->first();
+        if(!$msg){
+            return [];
+        }
 
         if (isset($msg->attachment)) {
             $attachmentOBJ = json_decode($msg->attachment);
@@ -125,13 +121,13 @@ class ChatifyMessenger
         return [
             'index' => $index,
             'id' => $msg->id,
-            'from_id' => $msg->clientId,
-            'to_id' => $msgRecepient,
-            'message' => $msg->content, // customized changes
-            // 'attachment' => [$attachment, $attachment_title, $attachment_type], //changed
-            'time' => $msg->createdAt->diffForHumans(), // changed
-            'fullTime' => $msg->createdAt, //changed
-            'viewType' => ($msg->userId == Auth::user()->id) ? 'sender' : 'default', //changed
+            'from_id' => $msg->from_id,
+            'to_id' => $msg->to_id,
+            'message' => $msg->body,
+            'attachment' => [$attachment, $attachment_title, $attachment_type],
+            'time' => $msg->created_at->diffForHumans(),
+            'fullTime' => $msg->created_at,
+            'viewType' => ($msg->from_id == Auth::user()->id) ? 'sender' : 'default',
             'seen' => $msg->seen,
         ];
     }
@@ -145,6 +141,9 @@ class ChatifyMessenger
      */
     public function messageCard($data, $viewType = null)
     {
+        if (!$data) {
+            return '';
+        }
         $data['viewType'] = ($viewType) ? $viewType : $data['viewType'];
         return view('Chatify::layouts.messageCard', $data)->render();
     }
@@ -157,11 +156,8 @@ class ChatifyMessenger
      */
     public function fetchMessagesQuery($user_id)
     {
-        // return Message::where('from_id', Auth::user()->id)->where('to_id', $user_id)
-        //             ->orWhere('from_id', $user_id)->where('to_id', Auth::user()->id);
-
-        // custom changes
-        return Message::where('userId', $user_id);
+        return Message::where('from_id', Auth::user()->id)->where('to_id', $user_id)
+                    ->orWhere('from_id', $user_id)->where('to_id', Auth::user()->id);
     }
 
     /**
@@ -173,12 +169,12 @@ class ChatifyMessenger
     public function newMessage($data)
     {
         $message = new Message();
-        // $message->id = $data['id'];
-        $message->type = $data['type']; // to change
-        $message->sessionId = $data['from_id']; // to change
-        $message->userId = $data['to_id'];
-        $message->content = $data['body'];
-        // $message->attachment = $data['attachment'];
+        $message->id = $data['id'];
+        $message->type = $data['type'];
+        $message->from_id = $data['from_id'];
+        $message->to_id = $data['to_id'];
+        $message->body = $data['body'];
+        $message->attachment = $data['attachment'];
         $message->save();
     }
 
@@ -191,17 +187,10 @@ class ChatifyMessenger
      */
     public function makeSeen($user_id)
     {
-        // Message::Where('from_id', $user_id)
-        //         ->where('to_id', Auth::user()->id)
-        //         ->where('seen', 0)
-        //         ->update(['seen' => 1]);
-
-
-        // to be delt with
-        // $to_id = DB::table('sessionMessages')
-        //             ->join('sessions', 'sessionMessages.sessionId', '=', ); 
-        
-        Message::Where('userId', $user_id)->where('seen', 0)->update(['seen' => 1]);
+        Message::Where('from_id', $user_id)
+                ->where('to_id', Auth::user()->id)
+                ->where('seen', 0)
+                ->update(['seen' => 1]);
         return 1;
     }
 
@@ -224,8 +213,7 @@ class ChatifyMessenger
      */
     public function countUnseenMessages($user_id)
     {
-        // return Message::where('from_id', $user_id)->where('to_id', Auth::user()->id)->where('seen', 0)->count();
-        return Message::where('userId', $user_id)->where('seen', 0)->count();
+        return Message::where('from_id', $user_id)->where('to_id', Auth::user()->id)->where('seen', 0)->count();
     }
 
     /**
@@ -317,7 +305,7 @@ class ChatifyMessenger
     {
         $images = array(); // Default
         // Get messages
-        $msgs = $this->fetchMessagesQuery($user_id)->orderBy('createdAt', 'DESC');
+        $msgs = $this->fetchMessagesQuery($user_id)->orderBy('created_at', 'DESC');
         if ($msgs->count() > 0) {
             foreach ($msgs->get() as $msg) {
                 // If message has attachment
