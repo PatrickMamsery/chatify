@@ -108,10 +108,13 @@ class ChatifyMessenger
         $attachment_type = null;
         $attachment_title = null;
 
+        // customized changes
+        $msgSender = Session::where('consultantId', Auth::user()->id)->first();
+        $msgRecepient = Message::where('userId', request()->segment(count(request()->segments())))->first();
+
+
         $msg = Message::where('id', $id)->first();
         
-        // customized changes
-        $msgRecepient = Session::where('consultantId', Auth::user()->id)->first();
 
         if (isset($msg->attachment)) {
             $attachmentOBJ = json_decode($msg->attachment);
@@ -125,13 +128,13 @@ class ChatifyMessenger
         return [
             'index' => $index,
             'id' => $msg->id,
-            'from_id' => $msg->clientId,
+            'from_id' => $msgSender->id,
             'to_id' => $msgRecepient,
             'message' => $msg->content, // customized changes
             // 'attachment' => [$attachment, $attachment_title, $attachment_type], //changed
             'time' => $msg->createdAt->diffForHumans(), // changed
             'fullTime' => $msg->createdAt, //changed
-            'viewType' => ($msg->userId == Auth::user()->id) ? 'sender' : 'default', //changed
+            'viewType' => ($msg->userId == Auth::user()->id) ? 'default' : 'sender', //changed
             'seen' => $msg->seen,
         ];
     }
