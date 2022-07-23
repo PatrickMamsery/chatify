@@ -175,10 +175,11 @@ class ChatifyMessenger
      */
     public function newMessage($data)
     {
+        $session = Session::where('clientId', $data['to_id'])->where('consultantId', $data['from_id'])->first();
         $message = new Message();
         // $message->id = $data['id'];
         $message->type = $data['type']; // to change
-        $message->sessionId = $data['from_id']; // to change
+        $message->sessionId = ($session ? $session->id : $data['from_id']); // to change
         $message->userId = $data['to_id'];
         $message->content = $data['body'];
         // $message->attachment = $data['attachment'];
