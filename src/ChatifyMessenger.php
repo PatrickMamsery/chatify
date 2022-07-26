@@ -134,7 +134,7 @@ class ChatifyMessenger
             // 'attachment' => [$attachment, $attachment_title, $attachment_type], //changed
             'time' => $msg->createdAt->diffForHumans(), // changed
             'fullTime' => $msg->createdAt, //changed
-            'viewType' => ($msg->userId == Auth::user()->id) ? 'default' : 'sender', //changed
+            'viewType' => ($msg->userId == Auth::user()->id) ? 'sender' : 'default', //reverted back
             'seen' => $msg->seen,
         ];
     }
@@ -164,7 +164,9 @@ class ChatifyMessenger
         //             ->orWhere('from_id', $user_id)->where('to_id', Auth::user()->id);
 
         // custom changes
-        return Message::where('userId', $user_id);
+        // return Message::where('userId', $user_id);
+        $session = Session::where('clientId', $user_id)->where('consultantId', Auth::user()->id)->first();
+        return Message::where('userId', $user_id)->where('sessionId', ($session ? $session->id : 1))->orWhere('userId', Auth::user()->id);
     }
 
     /**
@@ -180,7 +182,7 @@ class ChatifyMessenger
         // $message->id = $data['id'];
         $message->type = $data['type']; // to change
         $message->sessionId = ($session ? $session->id : $data['from_id']); // to change
-        $message->userId = $data['to_id'];
+        $message->userId = $data['from_id'];
         $message->content = $data['body'];
         // $message->attachment = $data['attachment'];
         $message->save();
@@ -372,7 +374,7 @@ class ChatifyMessenger
     {
         try {
             $msg = Message::findOrFail($id);
-                if ($msg->from_id == auth()->id()) {
+                if ($msg->userId == auth()->id()) {
                     // delete file attached if exist
                     if (isset($msg->attachment)) {
                         $path = config('chatify.attachments.folder') . '/' . json_decode($msg->attachment)->new_name;
